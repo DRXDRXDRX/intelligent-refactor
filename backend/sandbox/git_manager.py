@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class GitCheckpointManager:
     """
     基于 Git worktree 的检查点与软回滚管理器
-    
+
     主要功能：
     1. 为每个重构任务创建独立的 Git worktree 沙箱，避免污染主工作区
     2. 在重构的各个阶段（如代码修改后）创建 Git commit 作为检查点
@@ -21,15 +21,28 @@ class GitCheckpointManager:
     def __init__(self, project_path: str):
         """
         初始化 Git 管理器
-        :param project_path: 目标项目的绝对路径（必须是一个 Git 仓库）
+        :param project_path: 目标项目的绝对路径
         """
-        self.repo = Repo(project_path)
         self.project_path = project_path
+        try:
+            self.repo = Repo(project_path)
+        except Exception:
+            # 如果目标目录不是一个 Git 仓库，则在目标目录下初始化一个新的 Git 仓库
+            logger.info(
+                f"[Git] {project_path} is not a git repository. Initializing a new one...")
+            self.repo = Repo.init(project_path)
+            # 添加所有文件并做初始提交，否则无法创建分支和 worktree
+            self.repo.git.add("-A")
+            try:
+                self.repo.index.commit("Initial commit for sandbox")
+            except Exception as e:
+                logger.warning(
+                    f"[Git] Initial commit failed (directory might be empty): {e}")
 
     def create_worktree(self, task_id: str) -> str:
         """
         为指定任务创建一个隔离的 Git worktree 沙箱环境
-        
+
         :param task_id: 任务唯一标识 UUID
         :return: 创建的 worktree 的绝对路径
         """
@@ -78,7 +91,7 @@ class GitCheckpointManager:
     def create_checkpoint(self, worktree_path: str, message: str, phase: TaskPhase) -> CheckpointMeta:
         """
         在给定的 worktree 中创建一个 Git commit 作为检查点
-        
+
         :param worktree_path: 沙箱环境绝对路径
         :param message: 检查点描述信息
         :param phase: 当前处于的重构阶段
@@ -114,11 +127,11 @@ class GitCheckpointManager:
     def soft_rollback(self, worktree_path: str, target_commit_hash: str) -> str:
         """
         软回滚（Soft Rollback）机制
-        
+
         说明：当重构失败需要回退时，不直接覆盖或重置当前分支，
         而是基于当前错误现场切出一个 fork 分支进行保留，
         然后将当前分支 hard reset 到目标检查点的哈希值，以此实现安全的“时间旅行”。
-        
+
         :param worktree_path: 沙箱环境绝对路径
         :param target_commit_hash: 目标回滚位置的 commit hash
         :return: 保存错误现场的 fork 分支名称
@@ -129,7 +142,7 @@ class GitCheckpointManager:
         # 为当前的错误现场创建一个 fork 备份分支
         fork_name = f"{current_branch}-fork-{int(time.time())}"
         wt_repo.git.branch(fork_name)
-        
+
         # 将当前分支重置到目标检查点
         wt_repo.git.reset("--hard", target_commit_hash)
 
@@ -138,10 +151,10 @@ class GitCheckpointManager:
     def apply_to_main(self, worktree_path: str) -> str:
         """
         将沙箱中的修改合并回主仓库
-        
+
         说明：使用 squash merge 将零碎的检查点提交合并为单个整洁的提交，
         以此保持主仓库历史记录的干净。
-        
+
         :param worktree_path: 沙箱环境绝对路径
         :return: 合并后产生的新 commit hash
         """
@@ -158,7 +171,7 @@ class GitCheckpointManager:
     def cleanup_worktree(self, task_id: str, keep_days: int = 7):
         """
         清理释放指定任务的 worktree 沙箱环境
-        
+
         :param task_id: 任务唯一标识 UUID
         :param keep_days: 现场保留天数（这里暂未实现按天清理逻辑，目前是立即清理）
         """
