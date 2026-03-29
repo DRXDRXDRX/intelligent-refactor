@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RPCMessages",
+  "description": "Connect RPC 消息定义骨架",
+  "type": "object",
+  "properties": {
+    "AnalyzeRequest": {
+      "type": "object",
+      "properties": {
+        "files": { "type": "array", "items": { "type": "string" } },
+        "project_path": { "type": "string" }
+      }
+    },
+    "AnalyzeResponse": {
+      "type": "object",
+      "properties": {
+        "ast_result": { "type": "object" },
+        "dependencies": { "type": "object" }
+      }
+    }
+  }
+}

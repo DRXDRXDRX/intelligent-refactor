@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AnalysisReport",
+  "description": "代码分析报告的 Schema",
+  "type": "object",
+  "properties": {
+    "project_path": {
+      "type": "string"
+    },
+    "reports": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "ast": {
+            "type": "object"
+          },
+          "dependencies": {
+            "type": "object"
+          },
+          "smells": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "required": ["project_path", "reports"]
+}

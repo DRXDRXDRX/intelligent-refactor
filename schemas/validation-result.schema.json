@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ValidationResult",
+  "description": "多层验证结果的 Schema",
+  "type": "object",
+  "properties": {
+    "passed": {
+      "type": "boolean"
+    },
+    "static_check": {
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean" },
+        "errors": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "lint_check": {
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean" },
+        "errors": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "test_check": {
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean" },
+        "failures": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "semantic_check": {
+      "type": "object",
+      "properties": {
+        "equivalent": { "type": "boolean" },
+        "diffs": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "required": ["passed"]
+}

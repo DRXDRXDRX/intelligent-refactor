@@ -1,0 +1,25 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Backend for intelligent-refactor"
+authors = [
+    {name = "Trae", email = "trae@example.com"}
+]
+dependencies = [
+    "fastapi",
+    "langgraph",
+    "pydantic",
+    "SQLAlchemy",
+    "GitPython",
+    "aiodocker",
+    "uvicorn",
+    "datamodel-code-generator"
+]
+requires-python = ">=3.10"
+
+[tool.setuptools]
+py-modules = ["main", "config"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["api*", "agents*", "db*", "middleware*", "rpc*", "sandbox*"]

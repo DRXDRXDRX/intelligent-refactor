@@ -1,0 +1,187 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RefactorIR",
+  "description": "重构中间表示指令集 —— 连接 LLM 语义理解与编译器精确操作的结构化桥梁",
+  
+  "definitions": {
+    
+    "SemanticTarget": {
+      "description": "语义化目标定位。由 LLM 输出，使用人类可理解的符号名和作用域信息定位代码中的目标元素，避免依赖脆弱的行号定位。",
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string",
+          "description": "目标文件的相对路径（相对于项目根目录），例如 'src/components/Payment.tsx'"
+        },
+        "symbol_name": {
+          "type": "string",
+          "description": "目标符号的名称，例如函数名 'handlePayment'、组件名 'PaymentForm'、变量名 'totalAmount'"
+        },
+        "symbol_type": {
+          "type": "string",
+          "enum": ["function", "class", "variable", "interface", "type_alias", "component", "hook", "method", "property"],
+          "description": "目标符号的类型。'component' 特指 React 组件，'hook' 特指以 use 开头的自定义 Hook"
+        },
+        "parent_scope": {
+          "type": "string",
+          "description": "目标符号的父作用域名称，用于区分同名符号。例如当 class A 和 class B 都有 render 方法时，通过 parent_scope='A' 精确定位"
+        },
+        "context_hint": {
+          "type": "string",
+          "description": "额外的上下文提示，帮助引擎在歧义场景下缩小范围。例如 '处理支付回调的函数' 或 '第二个 useEffect'"
+        },
+        "line_hint": {
+          "type": "integer",
+          "description": "大致行号，仅作为辅助参考，不作为精确定位依据。当语义信息不足以唯一定位时，行号提示可帮助缩小候选范围"
+        }
+      },
+      "required": ["file", "symbol_name", "symbol_type"]
+    },
+
+    "ResolvedTarget": {
+      "description": "解析后的精确定位。由代码重写引擎在执行前自动填充，将语义定位解析为精确的 AST 节点引用。",
+      "type": "object",
+      "properties": {
+        "ast_node_id": {
+          "type": "string",
+          "description": "AST 中的唯一节点 ID，由引擎在解析时分配"
+        },
+        "resolved_range": {
+          "type": "object",
+          "description": "解析得到的精确代码范围（行号:列号）",
+          "properties": {
+            "start_line": { "type": "integer" },
+            "start_col": { "type": "integer" },
+            "end_line": { "type": "integer" },
+            "end_col": { "type": "integer" }
+          },
+          "required": ["start_line", "start_col", "end_line", "end_col"]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "匹配置信度。≥0.9 为高置信度（可直接执行），0.5~0.9 为中等（建议用户确认），<0.5 为低（需用户提供额外信息）"
+        }
+      },
+      "required": ["ast_node_id", "confidence"]
+    },
+
+    "ActionType": {
+      "description": "所有支持的重构操作类型枚举",
+      "type": "string",
+      "enum": [
+        "extract_function",
+        "inline_function",
+        "rename_symbol",
+        "inline_variable",
+        "extract_variable",
+        "change_signature",
+        "move_declaration",
+        "split_module",
+        "merge_modules",
+        "reorganize_imports",
+        "extract_component",
+        "extract_custom_hook",
+        "convert_class_to_hooks",
+        "extract_context",
+        "memoize_component",
+        "decompose_conditional",
+        "extract_interface",
+        "introduce_facade",
+        "convert_to_composition"
+      ]
+    },
+
+    "RefactorInstruction": {
+      "description": "单条重构指令。每条指令是一个原子操作，可独立执行和回滚。",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "指令的唯一标识符，用于声明指令间的依赖关系和执行日志追踪"
+        },
+        "action": {
+          "$ref": "#/definitions/ActionType",
+          "description": "重构操作类型"
+        },
+        "target": {
+          "$ref": "#/definitions/SemanticTarget",
+          "description": "操作目标的语义化定位（LLM 输出）"
+        },
+        "resolved_target": {
+          "$ref": "#/definitions/ResolvedTarget",
+          "description": "解析后的精确定位（引擎填充，LLM 不需要输出此字段）"
+        },
+        "parameters": {
+          "type": "object",
+          "description": "操作特定的参数，不同 action 类型有不同的参数结构"
+        },
+        "dependencies": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "本指令依赖的前置指令 ID 列表。依赖的指令必须先执行完毕"
+        },
+        "impact_scope": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "预估的影响文件列表，用于增量测试时确定测试范围"
+        },
+        "risk_level": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "description": "风险等级。low=仅局部影响（如 rename），medium=跨函数影响（如 extract），high=跨文件/架构影响（如 split_module）"
+        },
+        "description": {
+          "type": "string",
+          "description": "人类可读的操作描述，用于在用户审查界面展示"
+        }
+      },
+      "required": ["id", "action", "target", "parameters", "description"]
+    }
+  },
+
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "2.0",
+      "description": "Schema 版本号"
+    },
+    "project_path": {
+      "type": "string",
+      "description": "目标项目的路径"
+    },
+    "instructions": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/RefactorInstruction" },
+      "description": "重构指令列表"
+    },
+    "execution_order": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "指令执行顺序（指令 ID 列表）。考虑依赖关系后的拓扑排序结果"
+    },
+    "global_impact": {
+      "type": "object",
+      "description": "全局影响评估",
+      "properties": {
+        "affected_files": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "所有受影响的文件路径列表"
+        },
+        "estimated_changes": {
+          "type": "integer",
+          "description": "预估的代码变更行数"
+        },
+        "overall_risk": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "description": "整体风险等级（取所有指令中的最高风险）"
+        }
+      }
+    }
+  },
+  "required": ["version", "instructions", "execution_order"]
+}
